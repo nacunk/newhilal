@@ -5,7 +5,7 @@ Aplikasi web berbasis Streamlit untuk mendeteksi hilal pada citra dan video meng
 
 ## 🚀 Aplikasi Live
 
-Aplikasi ini telah dideploy ke Streamlit Cloud dan dapat diakses di: [https://new-hilal.streamlit.app/](https://new-hilal.streamlit.app/)
+Aplikasi ini telah dideploy ke Streamlit Cloud dan dapat diakses di: [https://newhilal.streamlit.app/](https://new-hilal.streamlit.app/)
 
 Fitur
 - Deteksi objek (hilal) pada gambar (upload / sample).
