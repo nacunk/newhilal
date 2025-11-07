@@ -1,6 +1,11 @@
 import streamlit as st
 import torch
-import cv2
+try:
+    import cv2
+    CV2_IMPORT_ERROR = None
+except Exception as e:
+    cv2 = None
+    CV2_IMPORT_ERROR = str(e)
 import numpy as np
 from PIL import Image
 import os
@@ -233,6 +238,14 @@ with st.sidebar:
 # Menu 1: Deteksi Hilal
 if menu == "🔍 Deteksi Hilal":
     st.header("🔍 Deteksi Hilal dari Citra / Video")
+
+    # Jika OpenCV gagal diimpor, tampilkan pesan yang jelas dan hentikan fitur deteksi
+    if cv2 is None:
+        st.error("OpenCV (cv2) gagal diimpor: libGL atau dependensi sistem mungkin hilang.")
+        if CV2_IMPORT_ERROR:
+            st.caption(f"Error import: {CV2_IMPORT_ERROR}")
+        st.info("Solusi: tambahkan file 'Aptfile' di root repo dengan paket: libgl1-mesa-glx, libglib2.0-0, libsm6, libxrender1, libxext6 lalu redeploy. Jika menggunakan opencv, gunakan 'opencv-python-headless' di requirements untuk environment tanpa GUI.")
+        st.stop()
 
     # Load model
     with st.spinner("Memuat model YOLOv5..."):
