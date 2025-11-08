@@ -438,9 +438,37 @@ if menu == "🔍 Deteksi Hilal":
 
         with col2:
             st.subheader("📊 Parameter Visibilitas")
-            altitude = st.slider("Altitude Hilal (°)", 0.0, 20.0, 7.0, 0.1)
-            elongation = st.slider("Elongasi (°)", 0.0, 30.0, 12.0, 0.1)
-            width = st.slider("Lebar Hilal (arcmin)", 0.0, 5.0, 1.5, 0.1)
+    
+            # Ganti slider dengan input number untuk presisi lebih tinggi
+            altitude = st.number_input(
+                "Altitude Hilal (°)", 
+                min_value=0.0, 
+                max_value=90.0, 
+                value=7.0, 
+                step=0.01,
+                format="%.2f",
+                help="Altitude hilal dalam derajat (0-90°)"
+            )
+    
+            elongation = st.number_input(
+                "Elongasi (°)", 
+                min_value=0.0, 
+                max_value=180.0, 
+                value=12.0, 
+                step=0.01,
+                format="%.2f",
+                help="Elongasi bulan-matahari dalam derajat (0-180°)"
+            )
+    
+            width = st.number_input(
+                "Lebar Hilal (arcmin)", 
+                min_value=0.0, 
+                max_value=30.0, 
+                value=1.5, 
+                step=0.01,
+                format="%.2f",
+                help="Lebar hilal dalam menit busur (0-30 arcmin)"
+            )
 
             criteria = st.selectbox(
                 "Pilih Kriteria Visibilitas Hilal:",
