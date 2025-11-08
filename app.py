@@ -210,13 +210,56 @@ if menu == "🔍 Deteksi Hilal":
 
         with col2:
             st.subheader("📊 Parameter Visibilitas")
-            altitude = st.slider("Altitude Hilal (°)", 0.0, 20.0, 7.0, 0.1)
-            elongation = st.slider("Elongasi (°)", 0.0, 30.0, 12.0, 0.1)
-            width = st.slider("Lebar Hilal (arcmin)", 0.0, 5.0, 1.5, 0.1)
+    
+            # Input dengan validasi
+            col_alt, col_elon, col_width = st.columns(3)
+    
+            with col_alt:
+                altitude = st.number_input(
+                    "Altitude Hilal (°)", 
+                    min_value=0.0, 
+                    max_value=90.0, 
+                    value=7.0, 
+                    step=0.01,
+                    format="%.2f",
+                    help="Altitude hilal dalam derajat (0-90°)"
+                )
+                if altitude < 0:
+                    st.warning("⚠️ Altitude negatif - hilal di bawah horizon")
+    
+            with col_elon:    
+                elongation = st.number_input(
+                    "Elongasi (°)", 
+                    min_value=0.0, 
+                    max_value=180.0, 
+                    value=12.0, 
+                    step=0.01,
+                    format="%.2f",
+                    help="Elongasi bulan-matahari dalam derajat (0-180°)"
+                )
+                if elongation < 3:
+                    st.warning("⚠️ Elongasi < 3° - kriteria MABIMS tidak terpenuhi")
+    
+            with col_width:    
+                width = st.number_input(
+                    "Lebar Hilal (arcmin)", 
+                    min_value=0.0, 
+                    max_value=30.0, 
+                    value=1.5, 
+                    step=0.01,
+                    format="%.2f",
+                    help="Lebar hilal dalam menit busur (0-30 arcmin)"
+                )
+                if width == 0:
+                    st.error("❌ Lebar hilal tidak boleh 0")
+
+            # Informasi nilai saat ini
+            st.info(f"**Nilai saat ini:** Altitude = {altitude:.3f}°, Elongasi = {elongation:.3f}°, Lebar = {width:.3f} arcmin")
 
             criteria = st.selectbox(
-                "Pilih Kriteria Visibilitas Hilal:",
-                ("Yallop", "MABIMS")
+                "**Pilih Kriteria Visibilitas Hilal:**",
+                ("Yallop", "MABIMS"),
+                help="Yallop: Berdasarkan nilai q | MABIMS: Altitude ≥ 2° dan Elongasi ≥ 3°"
             )
 
             if st.button("🔬 Analisis Visibilitas", type="primary"):
