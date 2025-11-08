@@ -218,7 +218,7 @@ def get_historical_data(start='2024-01-01', end='2024-12-31',
                         #Antisipasi perbedaan label event
                         # Cek altitude mataharri untuk konfirmasi
                         alt_sun, _, _ = observe.at(ti).observe(sun).apparent().altaz()
-                        if alt_sun.degrees < 0:
+                        if alt_sun.degrees < 0: 
                             sunset_t = ti
                             break
                     if sunset_t is None:
