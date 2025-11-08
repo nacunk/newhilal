@@ -239,8 +239,9 @@ def get_historical_data(start='2024-01-01', end='2024-12-31',
                     
                     # Fallback jika tidak ditemukan sunset
                     if sunset_t is None:
-                        sunset_guess = datetime(check_date.year, check_date.month, check_date.day, 17, 45)
-                        sunset_t = ts.utc(pytz.timezone('Asia/Jakarta').localize(sunset_guess))
+                        # Gunakan waktu sunset estimasi langsung dalam UTC
+                        sunset_guess = datetime(check_date.year, check_date.month, check_date.day, 10, 45)  # 17:45 WIB = 10:45 UTC
+                        sunset_t = ts.utc(sunset_guess)
                     
                     # Waktu pengamatan = sunset + offset
                     obs_time_utc = sunset_t.utc_datetime() + timedelta(minutes=offset_minutes)
