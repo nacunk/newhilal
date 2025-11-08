@@ -215,12 +215,16 @@ def get_historical_data(start='2024-01-01', end='2024-12-31',
                     
                     sunset_t = None
                     for ti, ev in zip(times, events):
-                        if ev == 0:  # 0 = sunset
+                        #Antisipasi perbedaan label event
+                        # Cek altitude mataharri untuk konfirmasi
+                        alt_sun, _, _ = observe.at(ti).observe(sun).apparent().altaz()
+                        if alt_sun.degrees < 0:
                             sunset_t = ti
                             break
-                    
                     if sunset_t is None:
-                        continue
+                        # fallback: ambil jam 17:45 lokal sebagai perkiraan sunset
+                        dt_guess = datetime.datetime(d.year, d.month, d.day, 17, 45)
+                        sunset_t = ts.utc(dt_guess - datetime.datetimedelta(hours=7)) # Jakarta UTC +7
                     
                     # Waktu pengamatan = sunset + offset
                     target_time = ts.utc(sunset_t.utc_datetime() + timedelta(minutes=offset_minutes))
