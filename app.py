@@ -181,8 +181,13 @@ def get_historical_data(start='2024-01-01', end='2024-12-31',
         # Dapatkan tanggal-tanggal ijtimak (new moon)
         start_date = pd.to_datetime(start)
         end_date = pd.to_datetime(end)
+        # Pastikan urutan waktu benar
+        if start_date > end_date:
+            start_date, end_date = end_date, start_date
+            
         t0 = ts.utc(start_date.year, start_date.month, start_date.day)
         t1 = ts.utc(end_date.year, end_date.month, end_date.day, 23, 59, 59)
+
         
         # Cari fase bulan baru (ijtimak)
         t, y = almanac.find_discrete(t0, t1, almanac.moon_phases(eph))
@@ -206,7 +211,7 @@ def get_historical_data(start='2024-01-01', end='2024-12-31',
                     t1_day = ts.utc(check_date.year, check_date.month, check_date.day, 23, 59, 59)
                     
                     f = almanac.sunrise_sunset(eph, observer)
-                    times, events = almanac.find_discrete(t0_day, t1_day, f)
+                    times, events = almanac.find_discrete(t0, t1, f)
                     
                     sunset_t = None
                     for ti, ev in zip(times, events):
