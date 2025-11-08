@@ -5,9 +5,5 @@ ultralytics
 tqdm
 opencv-python-headless
 Pillow
-skyfield
 numpy
-pandas
-matplotlib
 seaborn
-pytz
