@@ -195,6 +195,10 @@ def get_historical_data(start='2024-01-01', end='2024-12-31',
         # Filter hanya new moon (y == 0)
         new_moon_times = [ti for ti, phase in zip(t, y) if phase == 0]
         
+        if len(new_moon_times) == 0:
+            st.warning("Tidak ditemukan tanggal ijtimak pada rentang tersebut.")
+            return pd.DataFrame()
+
         rows = []
         
         # Untuk setiap ijtimak, ambil data ±1 hari
@@ -211,20 +215,20 @@ def get_historical_data(start='2024-01-01', end='2024-12-31',
                     t1_day = ts.utc(check_date.year, check_date.month, check_date.day, 23, 59, 59)
                     
                     f = almanac.sunrise_sunset(eph, observer)
-                    times, events = almanac.find_discrete(t0, t1, f)
+                    times, events = almanac.find_discrete(t0_day, t1_day, f)
                     
                     sunset_t = None
                     for ti, ev in zip(times, events):
                         #Antisipasi perbedaan label event
                         # Cek altitude mataharri untuk konfirmasi
-                        alt_sun, _, _ = observe.at(ti).observe(sun).apparent().altaz()
+                        alt_sun, _, _ = observer.at(ti).observe(sun).apparent().altaz()
                         if alt_sun.degrees < 0: 
                             sunset_t = ti
                             break
                     if sunset_t is None:
                         # fallback: ambil jam 17:45 lokal sebagai perkiraan sunset
                         dt_guess = datetime.datetime(d.year, d.month, d.day, 17, 45)
-                        sunset_t = ts.utc(dt_guess - datetime.datetimedelta(hours=7)) # Jakarta UTC +7
+                        sunset_t = ts.utc(dt_guess - datetime.timedelta(hours=7)) # Jakarta UTC +7
                     
                     # Waktu pengamatan = sunset + offset
                     target_time = ts.utc(sunset_t.utc_datetime() + timedelta(minutes=offset_minutes))
