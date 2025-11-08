@@ -439,43 +439,117 @@ if menu == "🔍 Deteksi Hilal":
         with col2:
             st.subheader("📊 Parameter Visibilitas")
     
-            # Ganti slider dengan input number untuk presisi lebih tinggi
-            altitude = st.number_input(
-                "Altitude Hilal (°)", 
-                min_value=0.0, 
-                max_value=90.0, 
-                value=7.0, 
-                step=0.01,
-                format="%.2f",
-                help="Altitude hilal dalam derajat (0-90°)"
+            # ⭐⭐ FITUR BARU: Kalkulator Otomatis dari Data Historis ⭐⭐
+            data_source = st.radio(
+                "Sumber Parameter:",
+                ["Input Manual", "Ambil dari Data Historis"],
+                horizontal=True,
+                key="data_source_radio"
             )
     
-            elongation = st.number_input(
-                "Elongasi (°)", 
-                min_value=0.0, 
-                max_value=180.0, 
-                value=12.0, 
-                step=0.01,
-                format="%.2f",
-                help="Elongasi bulan-matahari dalam derajat (0-180°)"
-            )
+            if data_source == "Ambil dari Data Historis":
+                # Cek apakah data historis sudah tersedia
+                if 'df_historical' in st.session_state and not st.session_state['df_historical'].empty:
+                    df_hist = st.session_state['df_historical']
+            
+                    # Pilih tanggal dari data historis
+                    dates = df_hist['Tanggal'].dt.strftime('%Y-%m-%d').unique().tolist()
+                    selected_date = st.selectbox(
+                        "Pilih Tanggal Observasi:",
+                        dates,
+                        key="hist_date_select"
+                )
+            
+                if selected_date:
+                    # Ambil data untuk tanggal yang dipilih
+                    selected_data = df_hist[
+                        df_hist['Tanggal'].dt.strftime('%Y-%m-%d') == selected_date
+                ].iloc[0]
+                
+                # Tampilkan data yang dipilih
+                st.info(f"""
+                **Data untuk {selected_date}:**
+                - Altitude: {selected_data['Altitude (°)']}°
+                - Elongasi: {selected_data['Elongasi (°)']}°
+                - Lebar: {selected_data['Lebar (arcmin)']} arcmin
+                - Illumination: {selected_data['Illumination (%)']}%
+                - Hari ke-: {selected_data['Hari ke-']} dari ijtimak
+                """)
+                
+                # Gunakan nilai dari data historis
+                altitude = float(selected_data['Altitude (°)'])
+                elongation = float(selected_data['Elongasi (°)'])
+                width = float(selected_data['Lebar (arcmin)'])
+                
+                # Tampilkan nilai yang digunakan (read-only)
+                st.text_input("Altitude (°)", value=f"{altitude:.3f}", disabled=True)
+                st.text_input("Elongasi (°)", value=f"{elongation:.3f}", disabled=True)
+                st.text_input("Lebar (arcmin)", value=f"{width:.3f}", disabled=True)
+                
+            else:
+                st.warning("""
+                **Data historis belum tersedia!**
+            
+                Silakan buka menu **📊 Data Historis** terlebih dahulu dan generate data 
+                untuk rentang tanggal yang diinginkan. Setelah itu, kembali ke menu ini.
+                """)
+            
+                # Fallback ke input manual
+                data_source = "Input Manual"
     
-            width = st.number_input(
-                "Lebar Hilal (arcmin)", 
-                min_value=0.0, 
-                max_value=30.0, 
-                value=1.5, 
-                step=0.01,
-                format="%.2f",
-                help="Lebar hilal dalam menit busur (0-30 arcmin)"
-            )
+        if data_source == "Input Manual":
+            st.write("**Input Parameter Manual:**")
+            col_alt, col_elon, col_width = st.columns(3)
+        
+            with col_alt:
+                altitude = st.number_input(
+                    "Altitude (°)", 
+                    min_value=-10.0,
+                    max_value=90.0, 
+                    value=7.0, 
+                    step=0.001,
+                    format="%.3f",
+                    key="altitude_manual"
+                )
+        
+            with col_elon:
+                elongation = st.number_input(
+                    "Elongasi (°)", 
+                    min_value=0.0, 
+                    max_value=180.0, 
+                    value=12.0, 
+                    step=0.001,
+                    format="%.3f",
+                    key="elongation_manual"
+                )
+        
+            with col_width:
+                width = st.number_input(
+                    "Lebar (arcmin)", 
+                    min_value=0.0, 
+                    max_value=30.0, 
+                    value=1.5, 
+                    step=0.001,
+                    format="%.3f",
+                    key="width_manual"
+                )
+        
+            # Validasi input
+            if altitude < 0:
+                st.warning("⚠️ Altitude negatif - hilal berada di bawah horizon")
+            if elongation < 3:
+                st.warning("⚠️ Elongasi < 3° - kriteria MABIMS tidak terpenuhi")
+            if width == 0:
+                st.error("❌ Lebar hilal tidak boleh 0")
 
-            criteria = st.selectbox(
-                "Pilih Kriteria Visibilitas Hilal:",
-                ("Yallop", "MABIMS")
-            )
+        # Kriteria visibilitas (tetap sama)
+        criteria = st.selectbox(
+            "Pilih Kriteria Visibilitas Hilal:",
+            ("Yallop", "MABIMS"),
+            key="criteria_select"
+        )
 
-            if st.button("🔬 Analisis Visibilitas", type="primary"):
+        if st.button("🔬 Analisis Visibilitas", type="primary"):
                 q_value, visibility = calculate_hilal_visibility(altitude, elongation, width)
 
                 if criteria == "MABIMS":
