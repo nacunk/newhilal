@@ -144,7 +144,7 @@ def get_mabims_status(altitude, elongation):
         pass
     
     # Implementasi manual
-    if altitude >= 2 and elongation >= 3:
+    if altitude >= 3 and elongation >= 6.4:
         return "Kriteria MABIMS terpenuhi"
     else:
         return "Kriteria MABIMS tidak terpenuhi"
