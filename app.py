@@ -188,7 +188,8 @@ def get_historical_data(start='2024-01-01', end='2024-12-31',
         t0 = ts.utc(start_date.year, start_date.month, start_date.day)
         t1 = ts.utc(end_date.year, end_date.month, end_date.day, 23, 59, 59)
 
-        
+        st.info(f"mencari ijtimak dari {start_date} sampai {end_date}")
+
         # Cari fase bulan baru (ijtimak)
         t, y = almanac.find_discrete(t0, t1, almanac.moon_phases(eph))
         
@@ -204,6 +205,7 @@ def get_historical_data(start='2024-01-01', end='2024-12-31',
         # Untuk setiap ijtimak, ambil data ±1 hari
         for ijtimak_time in new_moon_times:
             ijtimak_date = ijtimak_time.utc_datetime().date()
+            st.info(f"memproses ijtimak pada {ijtimak_date}")
             
             # Range ±1 hari dari ijtimak
             for day_offset in range(-1, 2):  # -1, 0, 1
@@ -219,16 +221,16 @@ def get_historical_data(start='2024-01-01', end='2024-12-31',
                     
                     sunset_t = None
                     for ti, ev in zip(times, events):
-                        #Antisipasi perbedaan label event
-                        # Cek altitude mataharri untuk konfirmasi
-                        alt_sun, _, _ = observer.at(ti).observe(sun).apparent().altaz()
-                        if alt_sun.degrees < 0: 
+                        # cari sunset (event = 0 untuk sunset, 1 untuk sunrise)
+                        if ev == 0:# Sunset
                             sunset_t = ti
                             break
+
+                    # jika tidak ditemukan sunset, gunakan fallback
                     if sunset_t is None:
                         # fallback: ambil jam 17:45 lokal sebagai perkiraan sunset
-                        dt_guess = datetime.datetime(d.year, d.month, d.day, 17, 45)
-                        sunset_t = ts.utc(dt_guess - datetime.timedelta(hours=7)) # Jakarta UTC +7
+                        dt_guess = datetime(check_date.year, check_date.month, check_date.day, 17, 45)
+                        sunset_t = ts.utc(dt_guess - timedelta(hours=7)) # Jakarta UTC +7
                     
                     # Waktu pengamatan = sunset + offset
                     target_time = ts.utc(sunset_t.utc_datetime() + timedelta(minutes=offset_minutes))
@@ -279,28 +281,15 @@ def get_historical_data(start='2024-01-01', end='2024-12-31',
                     })
                     
                 except Exception as e:
+                    st.error(f"Error pada tanggal {check_date}: {str(e)}")
                     continue
         
+        st.success(f"Berhasil menghsilkan {len(rows)} baris data")
         return pd.DataFrame(rows)
     
     except Exception as e:
-        st.error(f"Error menghasilkan data historis: {str(e)}")
-        # Fallback ke data dummy
-        dates = pd.date_range(start=start, end=end, freq='29D')
-        data = {
-            'Tanggal': dates,
-            'Ijtimak': dates,
-            'Hari ke-': [0] * len(dates),
-            'Altitude (°)': np.random.uniform(3, 15, len(dates)),
-            'Elongasi (°)': np.random.uniform(8, 20, len(dates)),
-            'Lebar (arcmin)': np.random.uniform(0.5, 2.5, len(dates)),
-            'Illumination (%)': np.random.uniform(1, 10, len(dates)),
-            'Q-Value': np.random.uniform(-0.5, 0.5, len(dates)),
-            'Status Yallop': ['N/A'] * len(dates),
-            'Status MABIMS': ['N/A'] * len(dates),
-            'Terdeteksi': np.random.choice(['Ya', 'Tidak'], len(dates), p=[0.7, 0.3])
-        }
-        st.warning(f"Menggunakan data dummy: {e}")
+        st.error(f"Error detail: {str(e)}")
+        st.error(f"Traceback: {traceback.format_exc()}")        
         return pd.DataFrame(data)
 
 # Header aplikasi
