@@ -270,13 +270,13 @@ else:
     
     ```
     hilal_detection_app/
-    ├── app.py              # Aplikasi utama
-    ├── models/             # Model YOLOv5
+    ├── app.py                 # Aplikasi utama Streamlit
+    ├── requirements.txt       # Dependensi Python
+    ├── packages.txt           # Paket sistem (untuk deployment)
+    ├── README.md              # Dokumentasi ini
+    ├── models/                # Folder model YOLOv5
     │   └── best.pt
-    ├── data/               # Data input
-    │   └── sample.jpg
-    ├── results/            # Hasil deteksi
-    └── hilalpy/            # Modul perhitungan
+    └── results/               # Folder hasil deteksi
     ```
     
     ### 🚀 Menjalankan Aplikasi

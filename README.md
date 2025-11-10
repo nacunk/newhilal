@@ -64,17 +64,8 @@ streamlit run app.py
 ├── README.md              # Dokumentasi ini
 ├── models/                # Folder model YOLOv5
 │   └── best.pt
-├── data/                  # Folder data input
-├── results/               # Folder hasil deteksi
-└── hilalpy/               # Modul perhitungan hilal
-    ├── __init__.py
-    ├── cond.py
-    ├── criteria.py        # Kriteria Yallop dan MABIMS
-    ├── divide.py
-    ├── equa.py
-    ├── multiply.py
-    ├── subtract.py
-    └── thres.py
+└── results/               # Folder hasil deteksi
+
 ```
 
 ## Tips & Troubleshooting
