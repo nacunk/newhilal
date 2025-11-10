@@ -12,6 +12,7 @@ import os
 import tempfile
 from pathlib import Path
 import sys
+from datetime import datetime
 
 # Import modul hilalpy
 sys.path.append(str(Path(__file__).parent))
@@ -95,68 +96,6 @@ def detect_hilal(image, model):
     
     return img_result, detections, results
 
-# Fungsi perhitungan visibilitas hilal
-def calculate_hilal_visibility(alt, elongation, width):
-    """
-    Menghitung visibilitas hilal menggunakan kriteria Yallop
-    """
-    try:
-        w = float(width)
-        w2 = w ** 2
-        w3 = w ** 3
-        threshold = 11.8371 - 6.3226 * w + 0.7319 * w2 - 0.1018 * w3
-        q_value = (float(alt) - threshold) / 10.0
-
-        if q_value >= 0.216:
-            visibility_status = "Mudah dilihat"
-        elif q_value >= -0.014:
-            visibility_status = "Dapat dilihat dengan kondisi ideal"
-        elif q_value >= -0.160:
-            visibility_status = "Memerlukan alat optik"
-        elif q_value >= -0.232:
-            visibility_status = "Hanya dapat dilihat dengan teleskop"
-        else:
-            visibility_status = "Tidak dapat dilihat"
-
-        return q_value, visibility_status
-
-    except Exception as e:
-        return None, f"Error perhitungan: {str(e)}"
-
-# Fungsi untuk mendapatkan status MABIMS
-def get_mabims_status(altitude, elongation):
-    """Mendapatkan status visibilitas berdasarkan kriteria MABIMS"""
-    try:
-        status = mabims(altitude, elongation)
-        return status
-    except Exception as e:
-        # Implementasi manual jika fungsi hilalpy gagal
-        if altitude >= 2 and elongation >= 3:
-            return "Kriteria MABIMS terpenuhi"
-        else:
-            return "Kriteria MABIMS tidak terpenuhi"
-
-# Fungsi untuk mendapatkan status Yallop
-def get_yallop_status(q_value):
-    """Mendapatkan status visibilitas berdasarkan kriteria Yallop"""
-    try:
-        status = yallop(q_value)
-        return status
-    except Exception as e:
-        # Implementasi manual jika fungsi hilalpy gagal
-        if q_value >= 0.216:
-            return "Mudah terlihat"
-        elif q_value >= -0.014:
-            return "Terlihat dalam kondisi ideal"
-        elif q_value >= -0.160:
-            return "Memerlukan alat optik"
-        elif q_value >= -0.232:
-            return "Hanya dengan teleskop"
-        else:
-            return "Tidak dapat dilihat"
-
-
-
 # Header aplikasi
 st.markdown('<div class="main-header">🌙 Sistem Deteksi Hilal Otomatis</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-header">Berbasis Deep Learning Menggunakan YOLOv5</div>', unsafe_allow_html=True)
@@ -198,10 +137,7 @@ if menu == "🔍 Deteksi Hilal":
 
         with col1:
             st.subheader("📤 Upload Citra")
-            uploaded_file = st.file_uploader(
-                "Pilih gambar hilal (JPG, PNG)",
-                type=['jpg', 'jpeg', 'png']
-            )
+            uploaded_file = st.file_uploader("Pilih gambar hilal (JPG, PNG)",type=['jpg', 'jpeg', 'png'])
 
             if uploaded_file is not None:
                 image = Image.open(uploaded_file)
