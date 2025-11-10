@@ -159,7 +159,7 @@ def get_yallop_status(q_value):
 
 # Header aplikasi
 st.markdown('<div class="main-header">🌙 Sistem Deteksi Hilal Otomatis</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Menggunakan YOLOv5 dan Analisis Visibilitas HilalPy</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Berbasis Deep Learning Menggunakan YOLOv5</div>', unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
@@ -168,7 +168,7 @@ with st.sidebar:
     
     menu = st.radio(
         "Pilih Menu:",
-        ["🔍 Deteksi Hilal", "ℹ️ Informasi"]  # HAPUS "📊 Data Historis"
+        ["🔍 Deteksi Hilal", "ℹ️ Informasi"]  
     )
     
     st.markdown("---")
@@ -208,83 +208,6 @@ if menu == "🔍 Deteksi Hilal":
                 st.image(image, caption="Gambar yang Diupload", use_column_width=True)
             else:
                 image = None
-
-        with col2:
-            st.subheader("📊 Parameter Visibilitas")
-    
-            # Input dengan validasi
-            col_alt, col_elon, col_width = st.columns(3)
-    
-            with col_alt:
-                altitude = st.number_input(
-                    "Altitude Hilal (°)", 
-                    min_value=0.0, 
-                    max_value=90.0, 
-                    value=7.0, 
-                    step=0.01,
-                    format="%.2f",
-                    help="Altitude hilal dalam derajat (0-90°)"
-                )
-                if altitude < 0:
-                    st.warning("⚠️ Altitude negatif - hilal di bawah horizon")
-    
-            with col_elon:    
-                elongation = st.number_input(
-                    "Elongasi (°)", 
-                    min_value=0.0, 
-                    max_value=180.0, 
-                    value=12.0, 
-                    step=0.01,
-                    format="%.2f",
-                    help="Elongasi bulan-matahari dalam derajat (0-180°)"
-                )
-                if elongation < 3:
-                    st.warning("⚠️ Elongasi < 3° - kriteria MABIMS tidak terpenuhi")
-    
-            with col_width:    
-                width = st.number_input(
-                    "Lebar Hilal (arcmin)", 
-                    min_value=0.0, 
-                    max_value=30.0, 
-                    value=1.5, 
-                    step=0.01,
-                    format="%.2f",
-                    help="Lebar hilal dalam menit busur (0-30 arcmin)"
-                )
-                if width == 0:
-                    st.error("❌ Lebar hilal tidak boleh 0")
-
-            # Informasi nilai saat ini
-            st.info(f"**Nilai saat ini:** Altitude = {altitude:.3f}°, Elongasi = {elongation:.3f}°, Lebar = {width:.3f} arcmin")
-
-            criteria = st.selectbox(
-                "**Pilih Kriteria Visibilitas Hilal:**",
-                ("Yallop", "MABIMS"),
-                help="Yallop: Berdasarkan nilai q | MABIMS: Altitude ≥ 2° dan Elongasi ≥ 3°"
-            )
-
-            if st.button("🔬 Analisis Visibilitas", type="primary"):
-                q_value, visibility = calculate_hilal_visibility(altitude, elongation, width)
-
-                if criteria == "MABIMS":
-                    status = get_mabims_status(altitude, elongation)
-                    st.info(f"Kriteria: MABIMS – Altitude={altitude}°, Elongasi={elongation}°")
-                    if "tidak" in status.lower():
-                        st.error(f"❌ {status}")
-                    else:
-                        st.success(f"✅ {status}")
-                else:
-                    if q_value is None:
-                        st.error(visibility)
-                    else:
-                        st.metric("Nilai q Yallop", f"{q_value:.3f}")
-                        status = get_yallop_status(q_value)
-                        if "Mudah" in status or "Terlihat" in status:
-                            st.success(f"✅ {status}")
-                        elif "optik" in status or "teleskop" in status:
-                            st.warning(f"⚠️ {status}")
-                        else:
-                            st.error(f"❌ {status}")
 
         if image is not None and model is not None:
             if st.button("🚀 Deteksi Hilal (Gambar)", type="primary"):
@@ -398,28 +321,14 @@ else:
     
     Aplikasi **Deteksi Hilal Otomatis** ini menggunakan teknologi:
     - **YOLOv5**: Model deep learning untuk deteksi objek hilal pada citra
-    - **HilalPy**: Library untuk perhitungan visibilitas hilal
     - **Streamlit**: Framework untuk antarmuka web interaktif
     
     ### 📖 Cara Penggunaan
     
     1. **Deteksi Hilal**:
        - Upload gambar hilal atau video
-       - Masukkan parameter visibilitas (altitude, elongasi, lebar)
        - Klik tombol "Deteksi Hilal" untuk memulai analisis
-       - Lihat hasil deteksi dan analisis visibilitas
-    
-    ### 🔬 Kriteria Visibilitas
-    
-    **Yallop (q-value)**:
-    - q ≥ +0.216: Mudah dilihat dengan mata telanjang
-    - -0.014 ≤ q < +0.216: Dapat dilihat dalam kondisi ideal
-    - -0.160 ≤ q < -0.014: Memerlukan alat optik
-    - -0.232 ≤ q < -0.160: Hanya dengan teleskop
-    - q < -0.232: Tidak dapat dilihat
-    
-    **MABIMS**:
-    - Altitude ≥ 2° dan Elongasi ≥ 3°
+       - Lihat hasil deteksi dan unduh Gambar/Video hasil
     
     ### 📁 Struktur Folder
     
