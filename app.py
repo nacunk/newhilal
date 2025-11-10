@@ -73,9 +73,8 @@ def load_model():
     
     try:
         model = torch.hub.load('ultralytics/yolov5', 'custom', 
-                                path=model_path, 
-                                trust_repo='check',
-                                skip_validation=True)
+                                path=str(model_path), 
+                                force_reload=True)
         model.conf = 0.25
         model.iou = 0.45
         return model
