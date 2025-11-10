@@ -10,14 +10,8 @@ import numpy as np
 from PIL import Image
 import os
 import tempfile
-from datetime import datetime, timedelta
-import pandas as pd
-import matplotlib.pyplot as plt
 from pathlib import Path
 import sys
-from skyfield.api import load, Topos
-from skyfield import almanac
-import pytz
 
 # Import modul hilalpy
 sys.path.append(str(Path(__file__).parent))
@@ -69,7 +63,7 @@ ICON_URL = "https://cdn-icons-png.flaticon.com/128/6419/6419754.png"
 # Fungsi untuk memuat model YOLOv5
 @st.cache_resource
 def load_model():
-    """Memuat model YOLOv5 yang sudah dilatih dengan fallback mechanism"""
+    """Memuat model YOLOv5 yang sudah dilatih"""
     model_path = MODELS_DIR / "best.pt"
     
     if not model_path.exists():
@@ -78,97 +72,15 @@ def load_model():
         return None
     
     try:
-        # **PERBAIKAN 1: Coba load dengan trust_repo='check'**
-        try:
-            model = torch.hub.load(
-                'ultralytics/yolov5', 
-                'custom', 
-                path=str(model_path), 
-                force_reload=False,
-                trust_repo='check',
-                skip_validation=True
-            )
-        except Exception as e1:
-            st.warning(f"Method 1 gagal: {str(e1)[:100]}... Mencoba metode alternatif...")
-            
-            # **PERBAIKAN 2: Coba load langsung dari local tanpa hub**
-            try:
-                import sys
-                yolo_path = Path.home() / '.cache' / 'torch' / 'hub' / 'ultralytics_yolov5_master'
-                
-                if not yolo_path.exists():
-                    # Download YOLOv5 repo jika belum ada
-                    st.info("Downloading YOLOv5 repository... (one-time setup)")
-                    torch.hub.load('ultralytics/yolov5', 'yolov5s', force_reload=True)
-                
-                # Import YOLOv5 detector
-                sys.path.insert(0, str(yolo_path))
-                from models.experimental import attempt_load
-                from utils.torch_utils import select_device
-                
-                device = select_device('')  # auto-select device
-                model = attempt_load(str(model_path), device=device)
-                
-                st.info("✅ Model loaded menggunakan metode lokal")
-                
-            except Exception as e2:
-                st.warning(f"Method 2 gagal: {str(e2)[:100]}...")
-                
-                # **PERBAIKAN 3: Fallback ke torch.load langsung**
-                try:
-                    checkpoint = torch.load(str(model_path), map_location='cpu')
-                    
-                    # Ekstrak model dari checkpoint
-                    if isinstance(checkpoint, dict):
-                        if 'model' in checkpoint:
-                            model = checkpoint['model']
-                        elif 'ema' in checkpoint:
-                            model = checkpoint['ema']
-                        else:
-                            raise Exception("Format checkpoint tidak dikenali")
-                    else:
-                        model = checkpoint
-                    
-                    # Set ke eval mode
-                    model = model.float()
-                    if hasattr(model, 'eval'):
-                        model.eval()
-                    
-                    st.info("✅ Model loaded menggunakan torch.load")
-                    
-                except Exception as e3:
-                    st.error(f"Semua metode loading gagal!")
-                    st.error(f"Error terakhir: {str(e3)}")
-                    return None
-        
-        # Set confidence dan IoU thresholds
-        if hasattr(model, 'conf'):
-            model.conf = 0.25
-        if hasattr(model, 'iou'):
-            model.iou = 0.45
-            
+        model = torch.hub.load('ultralytics/yolov5', 'custom', 
+                                path=model_path, 
+                                trust_repo='check',
+                                skip_validation=True)
+        model.conf = 0.25
+        model.iou = 0.45
         return model
-        
     except Exception as e:
         st.error(f"Error memuat model: {str(e)}")
-        st.info("""
-        **Solusi untuk error 'Authorization':**
-        
-        1. **Restart aplikasi** (refresh browser)
-        2. **Clear cache PyTorch Hub**:
-           ```bash
-           rm -rf ~/.cache/torch/hub
-           ```
-        3. **Set environment variable**:
-           ```bash
-           export TORCH_HOME=/tmp/torch
-           ```
-        4. **Tunggu beberapa menit** (GitHub API rate limit)
-        
-        Atau gunakan **metode offline**:
-        - Download YOLOv5 secara manual dari GitHub
-        - Letakkan di folder `yolov5/` di root project
-        """)
         return None
 
 # Fungsi deteksi hilal
@@ -244,135 +156,7 @@ def get_yallop_status(q_value):
         else:
             return "Tidak dapat dilihat"
 
-# Fungsi untuk simulasi data historis (REVISI UTAMA)
-def get_historical_data(start='2024-01-01', end='2024-12-31',
-                        location_lat=-6.2, location_lon=106.8, offset_minutes=10):
-    """
-    Generate data historis hilal menggunakan metode Skyfield sesuai buku
-    'Python untuk Astronomi Islam (Kasmui, 2025)'.
-    Parameter dihitung pada waktu sunset + offset (default 10 menit).
-    Filter hanya tanggal ijtimak ± 1 hari.
-    """
-    try:
-        ts = load.timescale()
-        eph = load('de421.bsp')
-        earth, moon, sun = eph['earth'], eph['moon'], eph['sun']
-        observer = earth + Topos(latitude_degrees=location_lat, longitude_degrees=location_lon)
-        
-        # Zona waktu lokal
-        tz = pytz.timezone('Asia/Jakarta')
-        
-        # Dapatkan tanggal-tanggal ijtimak (new moon)
-        start_date = pd.to_datetime(start)
-        end_date = pd.to_datetime(end)
-        t0 = ts.utc(start_date.year, start_date.month, start_date.day)
-        t1 = ts.utc(end_date.year, end_date.month, end_date.day, 23, 59, 59)
-        
-        # Cari fase bulan baru (ijtimak)
-        t, y = almanac.find_discrete(t0, t1, almanac.moon_phases(eph))
-        
-        # Filter hanya new moon (y == 0)
-        new_moon_times = [ti for ti, phase in zip(t, y) if phase == 0]
-        
-        rows = []
-        
-        # Untuk setiap ijtimak, ambil data ±1 hari
-        for ijtimak_time in new_moon_times:
-            ijtimak_date = ijtimak_time.utc_datetime().date()
-            
-            # Range ±1 hari dari ijtimak
-            for day_offset in range(-1, 2):  # -1, 0, 1
-                check_date = ijtimak_date + timedelta(days=day_offset)
-                
-                try:
-                    # Cari waktu sunset untuk tanggal ini
-                    t0_day = ts.utc(check_date.year, check_date.month, check_date.day, 0, 0, 0)
-                    t1_day = ts.utc(check_date.year, check_date.month, check_date.day, 23, 59, 59)
-                    
-                    f = almanac.sunrise_sunset(eph, observer)
-                    times, events = almanac.find_discrete(t0_day, t1_day, f)
-                    
-                    sunset_t = None
-                    for ti, ev in zip(times, events):
-                        if ev == 0:  # 0 = sunset
-                            sunset_t = ti
-                            break
-                    
-                    if sunset_t is None:
-                        continue
-                    
-                    # Waktu pengamatan = sunset + offset
-                    target_time = ts.utc(sunset_t.utc_datetime() + timedelta(minutes=offset_minutes))
-                    
-                    # Posisi Bulan dan Matahari
-                    astrometric_moon = observer.at(target_time).observe(moon).apparent()
-                    astrometric_sun = observer.at(target_time).observe(sun).apparent()
-                    
-                    alt_moon, az_moon, dist_moon = astrometric_moon.altaz()
-                    elong = astrometric_moon.separation_from(astrometric_sun).degrees
-                    
-                    # Fase bulan (sudut fase)
-                    moon_phase_angle = almanac.moon_phase(eph, target_time).degrees
-                    
-                    # Illumination (%)
-                    illumination = (1 - np.cos(np.radians(moon_phase_angle))) / 2 * 100
-                    
-                    # Lebar hilal (arcmin) - aproksimasi dari illumination
-                    # Diameter sudut rata-rata bulan ~30 arcmin
-                    width_arcmin = (illumination / 100.0) * 30.0
-                    
-                    # Hitung kriteria Yallop
-                    q_value, vis_status = calculate_hilal_visibility(
-                        alt_moon.degrees, elong, width_arcmin
-                    )
-                    
-                    # Status Yallop
-                    yallop_status = get_yallop_status(q_value) if q_value is not None else "N/A"
-                    
-                    # Status MABIMS
-                    mabims_status = get_mabims_status(alt_moon.degrees, elong)
-                    
-                    # Deteksi (berdasarkan q_value)
-                    detected = "Ya" if q_value and q_value > -0.232 else "Tidak"
-                    
-                    rows.append({
-                        'Tanggal': pd.Timestamp(check_date),
-                        'Ijtimak': pd.Timestamp(ijtimak_date),
-                        'Hari ke-': day_offset,
-                        'Altitude (°)': round(alt_moon.degrees, 2),
-                        'Elongasi (°)': round(elong, 2),
-                        'Lebar (arcmin)': round(width_arcmin, 2),
-                        'Illumination (%)': round(illumination, 2),
-                        'Q-Value': round(q_value, 3) if q_value else None,
-                        'Status Yallop': yallop_status,
-                        'Status MABIMS': mabims_status,
-                        'Terdeteksi': detected
-                    })
-                    
-                except Exception as e:
-                    continue
-        
-        return pd.DataFrame(rows)
-    
-    except Exception as e:
-        st.error(f"Error menghasilkan data historis: {str(e)}")
-        # Fallback ke data dummy
-        dates = pd.date_range(start=start, end=end, freq='29D')
-        data = {
-            'Tanggal': dates,
-            'Ijtimak': dates,
-            'Hari ke-': [0] * len(dates),
-            'Altitude (°)': np.random.uniform(3, 15, len(dates)),
-            'Elongasi (°)': np.random.uniform(8, 20, len(dates)),
-            'Lebar (arcmin)': np.random.uniform(0.5, 2.5, len(dates)),
-            'Illumination (%)': np.random.uniform(1, 10, len(dates)),
-            'Q-Value': np.random.uniform(-0.5, 0.5, len(dates)),
-            'Status Yallop': ['N/A'] * len(dates),
-            'Status MABIMS': ['N/A'] * len(dates),
-            'Terdeteksi': np.random.choice(['Ya', 'Tidak'], len(dates), p=[0.7, 0.3])
-        }
-        st.warning(f"Menggunakan data dummy: {e}")
-        return pd.DataFrame(data)
+
 
 # Header aplikasi
 st.markdown('<div class="main-header">🌙 Sistem Deteksi Hilal Otomatis</div>', unsafe_allow_html=True)
@@ -385,7 +169,7 @@ with st.sidebar:
     
     menu = st.radio(
         "Pilih Menu:",
-        ["🔍 Deteksi Hilal", "📊 Data Historis", "ℹ️ Informasi"]
+        ["🔍 Deteksi Hilal", "ℹ️ Informasi"]  # HAPUS "📊 Data Historis"
     )
     
     st.markdown("---")
@@ -399,40 +183,14 @@ if menu == "🔍 Deteksi Hilal":
         st.error("OpenCV (cv2) gagal diimpor: libGL atau dependensi sistem mungkin hilang.")
         if CV2_IMPORT_ERROR:
             st.caption(f"Error import: {CV2_IMPORT_ERROR}")
-        st.info("Solusi: Gunakan opencv-python-headless di requirements.txt")
+        st.info("Solusi: tambahkan file 'Aptfile' di root repo dengan paket: libgl1-mesa-glx, libglib2.0-0, libsm6, libxrender1, libxext6 lalu redeploy.")
         st.stop()
-
-    # **PERBAIKAN: Tambahkan tombol clear cache**
-    with st.expander("🔧 Troubleshooting Model"):
-        st.write("Jika model gagal dimuat dengan error 'Authorization':")
-        
-        col_a, col_b = st.columns(2)
-        with col_a:
-            if st.button("🔄 Clear Cache & Reload"):
-                st.cache_resource.clear()
-                st.rerun()
-        
-        with col_b:
-            if st.button("🗑️ Clear PyTorch Hub Cache"):
-                import shutil
-                cache_dir = Path.home() / '.cache' / 'torch' / 'hub'
-                if cache_dir.exists():
-                    try:
-                        shutil.rmtree(cache_dir)
-                        st.success("✅ Cache cleared! Silakan refresh halaman.")
-                    except Exception as e:
-                        st.error(f"Gagal clear cache: {e}")
-                else:
-                    st.info("Cache sudah bersih")
 
     with st.spinner("Memuat model YOLOv5..."):
         model = load_model()
 
     if model is not None:
         st.success("✅ Model berhasil dimuat!")
-    else:
-        st.error("❌ Model gagal dimuat. Cek troubleshooting di atas.")
-        st.stop()
 
     mode = st.radio("Pilih mode deteksi:", ["Deteksi Gambar", "Deteksi Video"], horizontal=True)
 
@@ -454,13 +212,56 @@ if menu == "🔍 Deteksi Hilal":
 
         with col2:
             st.subheader("📊 Parameter Visibilitas")
-            altitude = st.slider("Altitude Hilal (°)", 0.0, 20.0, 7.0, 0.1)
-            elongation = st.slider("Elongasi (°)", 0.0, 30.0, 12.0, 0.1)
-            width = st.slider("Lebar Hilal (arcmin)", 0.0, 5.0, 1.5, 0.1)
+    
+            # Input dengan validasi
+            col_alt, col_elon, col_width = st.columns(3)
+    
+            with col_alt:
+                altitude = st.number_input(
+                    "Altitude Hilal (°)", 
+                    min_value=0.0, 
+                    max_value=90.0, 
+                    value=7.0, 
+                    step=0.01,
+                    format="%.2f",
+                    help="Altitude hilal dalam derajat (0-90°)"
+                )
+                if altitude < 0:
+                    st.warning("⚠️ Altitude negatif - hilal di bawah horizon")
+    
+            with col_elon:    
+                elongation = st.number_input(
+                    "Elongasi (°)", 
+                    min_value=0.0, 
+                    max_value=180.0, 
+                    value=12.0, 
+                    step=0.01,
+                    format="%.2f",
+                    help="Elongasi bulan-matahari dalam derajat (0-180°)"
+                )
+                if elongation < 3:
+                    st.warning("⚠️ Elongasi < 3° - kriteria MABIMS tidak terpenuhi")
+    
+            with col_width:    
+                width = st.number_input(
+                    "Lebar Hilal (arcmin)", 
+                    min_value=0.0, 
+                    max_value=30.0, 
+                    value=1.5, 
+                    step=0.01,
+                    format="%.2f",
+                    help="Lebar hilal dalam menit busur (0-30 arcmin)"
+                )
+                if width == 0:
+                    st.error("❌ Lebar hilal tidak boleh 0")
+
+            # Informasi nilai saat ini
+            st.info(f"**Nilai saat ini:** Altitude = {altitude:.3f}°, Elongasi = {elongation:.3f}°, Lebar = {width:.3f} arcmin")
 
             criteria = st.selectbox(
-                "Pilih Kriteria Visibilitas Hilal:",
-                ("Yallop", "MABIMS")
+                "**Pilih Kriteria Visibilitas Hilal:**",
+                ("Yallop", "MABIMS"),
+                help="Yallop: Berdasarkan nilai q | MABIMS: Altitude ≥ 2° dan Elongasi ≥ 3°"
             )
 
             if st.button("🔬 Analisis Visibilitas", type="primary"):
@@ -589,119 +390,7 @@ if menu == "🔍 Deteksi Hilal":
         elif uploaded_video is not None and model is None:
             st.error("Model belum dimuat. Pastikan model berada di folder models/ dan coba lagi.")
 
-# Menu 2: Data Historis
-elif menu == "📊 Data Historis":
-    st.header("📊 Data Historis Observasi Hilal")
-    
-    with st.expander("⚙️ Pengaturan Rentang & Lokasi", expanded=True):
-        col_a, col_b = st.columns(2)
-        with col_a:
-            start_date = st.date_input("Dari Tanggal", value=datetime(2024, 1, 1).date())
-            end_date = st.date_input("Sampai Tanggal", value=datetime(2024, 12, 31).date())
-        with col_b:
-            latitude = st.number_input("Latitude (°)", value=-6.2, format="%.6f")
-            longitude = st.number_input("Longitude (°)", value=106.8, format="%.6f")
-            offset_minutes = st.number_input("Offset dari Sunset (menit)", min_value=0, max_value=60, value=10)
-        
-        generate = st.button("🔄 Generate Data Historis")
-    
-    if generate or 'df_historical' not in st.session_state:
-        with st.spinner("Menghasilkan data historis..."):
-            df_historical = get_historical_data(
-                start=start_date.strftime("%Y-%m-%d"),
-                end=end_date.strftime("%Y-%m-%d"),
-                location_lat=latitude,
-                location_lon=longitude,
-                offset_minutes=int(offset_minutes)
-            )
-            st.session_state['df_historical'] = df_historical
-    else:
-        df_historical = st.session_state['df_historical']
-    
-    if not df_historical.empty:
-        df_historical['Tanggal'] = pd.to_datetime(df_historical['Tanggal'])
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        ui_start = st.date_input("Filter Dari", value=df_historical['Tanggal'].min().date() if not df_historical.empty else start_date)
-    with col2:
-        ui_end = st.date_input("Filter Sampai", value=df_historical['Tanggal'].max().date() if not df_historical.empty else end_date)
-    
-    mask = True
-    if not df_historical.empty:
-        mask = (df_historical['Tanggal'].dt.date >= ui_start) & (df_historical['Tanggal'].dt.date <= ui_end)
-    df_filtered = df_historical[mask] if not df_historical.empty else df_historical.copy()
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Total Observasi", len(df_filtered))
-    with col2:
-        detected = len(df_filtered[df_filtered['Terdeteksi'] == 'Ya']) if not df_filtered.empty else 0
-        st.metric("Terdeteksi", detected)
-    with col3:
-        avg_alt = df_filtered['Altitude (°)'].mean() if not df_filtered.empty else 0.0
-        st.metric("Rata-rata Altitude", f"{avg_alt:.2f}°")
-    with col4:
-        avg_illum = df_filtered['Illumination (%)'].mean() if not df_filtered.empty and 'Illumination (%)' in df_filtered.columns else 0.0
-        st.metric("Rata-rata Illumination", f"{avg_illum:.2f}%")
-    
-    st.subheader("📋 Tabel Data")
-    st.dataframe(df_filtered, use_container_width=True)
-    
-    st.subheader("📈 Visualisasi Data")
-    
-    tab1, tab2, tab3 = st.tabs(["Grafik Altitude", "Distribusi Deteksi", "Illumination vs Altitude"])
-    
-    with tab1:
-        if df_filtered.empty:
-            st.info("Tidak ada data untuk diplot.")
-        else:
-            fig, ax = plt.subplots(figsize=(10, 4))
-            ax.plot(df_filtered['Tanggal'], df_filtered['Altitude (°)'], marker='o', linewidth=2)
-            ax.set_xlabel('Tanggal')
-            ax.set_ylabel('Altitude (°)')
-            ax.set_title('Altitude Hilal Sepanjang Waktu')
-            ax.grid(True, alpha=0.3)
-            plt.xticks(rotation=45)
-            plt.tight_layout()
-            st.pyplot(fig)
-    
-    with tab2:
-        if df_filtered.empty:
-            st.info("Tidak ada data untuk diplot.")
-        else:
-            fig, ax = plt.subplots(figsize=(6, 4))
-            detection_counts = df_filtered['Terdeteksi'].value_counts()
-            ax.pie(detection_counts.values, labels=detection_counts.index, autopct='%1.1f%%', startangle=90)
-            ax.set_title('Distribusi Status Deteksi')
-            st.pyplot(fig)
-    
-    with tab3:
-        if df_filtered.empty or 'Illumination (%)' not in df_filtered.columns:
-            st.info("Tidak ada data untuk diplot.")
-        else:
-            fig, ax = plt.subplots(figsize=(8, 5))
-            scatter = ax.scatter(df_filtered['Illumination (%)'], df_filtered['Altitude (°)'], 
-                               c=df_filtered['Terdeteksi'].map({'Ya': 'green', 'Tidak': 'red'}),
-                               alpha=0.6, s=100)
-            ax.set_xlabel('Illumination (%)')
-            ax.set_ylabel('Altitude (°)')
-            ax.set_title('Hubungan Illumination vs Altitude')
-            ax.grid(True, alpha=0.3)
-            ax.legend(['Terdeteksi: Ya', 'Terdeteksi: Tidak'])
-            plt.tight_layout()
-            st.pyplot(fig)
-    
-    csv = df_filtered.to_csv(index=False)
-    st.download_button(
-        "💾 Download Data CSV",
-        csv,
-        file_name=f"data_historis_hilal_{datetime.now().strftime('%Y%m%d')}.csv",
-        mime="text/csv"
-    )
-
-# Menu 3: Informasi
+# Menu 2: Informasi
 else:
     st.header("ℹ️ Informasi Aplikasi")
     
@@ -711,7 +400,6 @@ else:
     Aplikasi **Deteksi Hilal Otomatis** ini menggunakan teknologi:
     - **YOLOv5**: Model deep learning untuk deteksi objek hilal pada citra
     - **HilalPy**: Library untuk perhitungan visibilitas hilal
-    - **Skyfield**: Library astronomi untuk perhitungan akurat posisi bulan
     - **Streamlit**: Framework untuk antarmuka web interaktif
     
     ### 📖 Cara Penggunaan
@@ -721,13 +409,6 @@ else:
        - Masukkan parameter visibilitas (altitude, elongasi, lebar)
        - Klik tombol "Deteksi Hilal" untuk memulai analisis
        - Lihat hasil deteksi dan analisis visibilitas
-    
-    2. **Data Historis**:
-       - Generate data observasi hilal berdasarkan ijtimak
-       - Data hanya untuk tanggal ±1 hari dari ijtimak
-       - Filter berdasarkan rentang tanggal
-       - Analisis statistik dan visualisasi
-       - Download data dalam format CSV
     
     ### 🔬 Kriteria Visibilitas
     
@@ -740,14 +421,6 @@ else:
     
     **MABIMS**:
     - Altitude ≥ 2° dan Elongasi ≥ 3°
-    
-    ### 🆕 Fitur Baru
-    
-    - ✅ Kolom **Illumination (%)** untuk menunjukkan persentase cahaya bulan
-    - ✅ Kolom **Status Yallop** dan **Status MABIMS** otomatis
-    - ✅ Filter data berdasarkan **tanggal ijtimak ± 1 hari** menggunakan `almanac.moon_phases`
-    - ✅ Perhitungan akurat menggunakan waktu **sunset + offset** (default 10 menit)
-    - ✅ Visualisasi hubungan **Illumination vs Altitude**
     
     ### 📁 Struktur Folder
     
@@ -772,9 +445,3 @@ else:
     
     Untuk pertanyaan atau dukungan, silakan hubungi 📨 kholidnacunk@gmail.com.
     """)
-    
-    st.info("💡 **Tips**: Pastikan model YOLOv5 (best.pt) sudah dilatih dengan dataset hilal yang memadai untuk hasil optimal!")
-
-# Footer
-st.markdown("---")
-st.caption("© 2024 Sistem Deteksi Hilal Otomatis | Powered by YOLOv5 & HilalPy")
