@@ -17,7 +17,6 @@ from datetime import datetime
 # Import modul hilalpy
 sys.path.append(str(Path(__file__).parent))
 from hilalpy import cond, divide, equa, multiply, subtract, thres
-from hilalpy.criteria import mabims, yallop
 
 # Konfigurasi halaman
 st.set_page_config(
